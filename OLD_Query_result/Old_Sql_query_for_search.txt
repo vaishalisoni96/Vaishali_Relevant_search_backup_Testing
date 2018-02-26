@@ -1,0 +1,229 @@
+USE [omsdata2]
+GO
+/****** Object:  StoredProcedure [dbo].[SP_COTS_GetSelectedSearchProduct]    Script Date: 2/24/2018 12:32:24 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+--[dbo].[SP_COTS_GetSelectedSearchProduct] '0',0,1,1000,0,1,1000,'uzi tactical pen',1
+ALTER PROCEDURE [dbo].[SP_COTS_GetSelectedSearchProduct]
+@CATEGORYID nvarchar(50),
+@sort int,
+@PageNumber int=1,
+@PageSize int=10,
+@param int=0,
+@minprice decimal=0,
+@maxprice decimal=1000,
+@search nvarchar(50),
+@cusType int=1
+AS
+SET NOCOUNT ON
+BEGIN
+if @search !=''
+begin 
+if(@cusType=1)
+	BEGIN
+	declare @strsplit as nvarchar(max)='';	
+	 DECLARE @Counter INT
+	 Declare @query as nvarchar(max)
+	 declare @count as int
+     SET @Counter = 1
+	 declare @pagition as nvarchar(max)
+	--declare @search as nvarchar(max)='UZK'
+      set @count=(select count(*) from dbo.fnSplitString(@search,' ')as count)
+  DECLARE Printproduct CURSOR READ_ONLY
+      FOR
+    	select * from dbo.fnSplitString(@search,' ')		
+      --OPEN CURSOR.
+      OPEN Printproduct
+	     FETCH NEXT FROM Printproduct INTO
+			@strsplit	
+			 set  @query='SELECT distinct  WI.*,i.[PRS_TYPE], i.[RETAIL_PRS], i.[WHOLE_PRS], i.[WHOLE_PRS2], i.[WHOLE_PRS3],i.[CORP_PRS], i.[PRICE_1], i.[PRICE_2], i.[PRICE_3], i.[PRICE_4],i.[PRICE_5], i.[PRICE_6], i.[RG_X], i.[RG_0], i.[RG_1],i.[RG_2], i.[RG_3], i.[RG_4], i.[RG_5], i.[RG_6],i.[CLASS_CD], i.[MINSTOCK] 
+			,CASE WHEN INSTOCK > 0 THEN  ''Available: '' + convert(varchar, cast(instock as int))  ELSE  ''Out of Stock: Available for Backorder''  END AS CurrentStock
+			FROM 
+			(select i.* from inv i  join WebInvOther WIO on i.PROD_CD=WIO.PROD_CD where '
+	     WHILE @@FETCH_STATUS = 0
+		 BEGIN
+             SET @Counter = @Counter + 1	
+			 set @query+='i.Prod_Cd like ''%'+@strsplit+'%'' or  i.DESCRIP like ''% '+@strsplit+' %'' or  i.DESCRIP1 like ''% '+@strsplit+' %'' or  i.DESCRIP2 like ''% '+@strsplit+' %'' or  WIO.DetailDescription like ''% '+@strsplit+' %'''
+				if @Counter <=@count
+				begin 		
+				set @query+= ' or '	
+				end				
+                 FETCH NEXT FROM Printproduct INTO
+               @strsplit				 			 		 
+       END
+	  set @query+=' ) AS i JOIN WebJoinCategoryInv AS CI ON i.PROD_CD= CI.PROD_CD
+		Inner Join WebInv WI On WI.PROD_CD = i.PROD_CD 
+		left outer join WebInvOther WIO on WIO.PROD_CD= Wi.PROD_CD 
+		inner join webcategory Wc on wc.CategoryId = ci.CategoryID
+		inner join inv_data ID on id.PROD_CD = wi.PROD_CD
+		left outer join [ProductsView] on [ProductsView].SKU=WI.PROD_CD
+		left outer join CS_BestSellers BS on BS.PROD_CD=WI.PROD_CD		
+		 order by WI.PROD_CD'		 
+       print @query
+		set @query+=' OFFSET CONVERT(int,'''+ Convert(varchar(5),(@PageSize * (@PageNumber - 1)))+''')'
+		set @query+=' ROWS FETCH NEXT CONVERT(int,'''+  Convert(varchar(5),@PageSize) +''') ROWS ONLY;'
+      --CLOSE THE CURSOR.
+      CLOSE Printproduct
+      DEALLOCATE Printproduct	 	
+	 Exec SP_Executesql @query 
+	END
+	ELSE
+	BEGIN
+	declare @strsplit_del as nvarchar(max)='';	
+	 DECLARE @Counter_del INT
+	 Declare @query_del as nvarchar(max)
+	 declare @count_del as int
+     SET @Counter_del = 1	
+     set @count_del=(select count(*) from dbo.fnSplitString(@search,' ')as count)
+  DECLARE Printproduct CURSOR READ_ONLY
+      FOR
+      select * from dbo.fnSplitString(@search,' ')		
+      --OPEN CURSOR.
+      OPEN Printproduct
+	     FETCH NEXT FROM Printproduct INTO
+           @strsplit_del	
+			 set  @query_del='SELECT distinct  WI.*,i.[PRS_TYPE], i.[RETAIL_PRS], i.[WHOLE_PRS], i.[WHOLE_PRS2], i.[WHOLE_PRS3],i.[CORP_PRS], i.[PRICE_1], i.[PRICE_2], i.[PRICE_3], i.[PRICE_4],i.[PRICE_5], i.[PRICE_6], i.[RG_X], i.[RG_0], i.[RG_1],i.[RG_2], i.[RG_3], i.[RG_4], i.[RG_5], i.[RG_6],i.[CLASS_CD], i.[MINSTOCK] 
+			,CASE WHEN INSTOCK > 0 THEN  ''Available: '' + convert(varchar, cast(instock as int))  ELSE  ''Out of Stock: Available for Backorder''  END AS CurrentStock
+			FROM 
+			(select i.* from inv i  join WebInvOther WIO on i.PROD_CD=WIO.PROD_CD where '
+	  WHILE @@FETCH_STATUS = 0
+      BEGIN            	 												
+             SET @Counter_del = @Counter_del + 1	
+			 set @query_del+='i.Prod_Cd like ''%'+@strsplit_del+'%'' or  i.DESCRIP like ''% '+@strsplit_del+' %'' or  i.DESCRIP1 like ''% '+@strsplit_del+' %'' or  i.DESCRIP2 like ''% '+@strsplit_del+' %'' or  WIO.DetailDescription like ''% '+@strsplit_del+' %'''
+			if @Counter_del <=@count_del
+			begin 		
+			set @query_del+=' or '				
+			end			
+            FETCH NEXT FROM Printproduct INTO
+            @strsplit_del				 			 		 
+      END
+	  set @query_del+=' ) AS i JOIN WebJoinCategoryInv AS CI ON i.PROD_CD= CI.PROD_CD
+		Inner Join WebInv WI On WI.PROD_CD = i.PROD_CD 
+		left outer join WebInvOther WIO on WIO.PROD_CD= Wi.PROD_CD 
+		inner join webcategory Wc on wc.CategoryId = ci.CategoryID
+		inner join inv_data ID on id.PROD_CD = wi.PROD_CD
+		left outer join [ProductsView] on [ProductsView].SKU=WI.PROD_CD
+		left outer join CS_BestSellers BS on BS.PROD_CD=WI.PROD_CD		
+		 order by WI.PROD_CD'		 
+       print @query_del
+		set @query_del+=' OFFSET CONVERT(int,'''+ Convert(varchar(5),(@PageSize * (@PageNumber - 1)))+''')'
+		set @query_del+=' ROWS FETCH NEXT CONVERT(int,'''+  Convert(varchar(5),@PageSize) +''') ROWS ONLY;'
+      --CLOSE THE CURSOR.
+      CLOSE Printproduct
+      DEALLOCATE Printproduct	 	
+		 Exec SP_Executesql @query_del 
+			 
+	END
+end
+else
+BEGIN
+declare @sql as nvarchar(max)=''
+	set @sql='SELECT distinct WI.prod_cd,WI.*,i.[PRS_TYPE], i.[RETAIL_PRS], i.[WHOLE_PRS], i.[WHOLE_PRS2], i.[WHOLE_PRS3],i.[CORP_PRS], i.[PRICE_1], i.[PRICE_2], i.[PRICE_3], i.[PRICE_4],i.[PRICE_5], i.[PRICE_6], i.[RG_X], i.[RG_0], i.[RG_1],i.[RG_2], i.[RG_3], i.[RG_4], i.[RG_5], i.[RG_6],i.[CLASS_CD], i.[MINSTOCK],i.CREATE_DT,PV.InStock,BS.[TotalSold],i.PROD_CD
+	,CASE WHEN INSTOCK > 0 THEN  CONCAT(''Available: '' , convert(varchar, cast(instock as int)))  ELSE  ''Out of Stock: Available for Backorder''  END AS CurrentStock
+	FROM  WebInv AS WI
+	JOIN WebJoinCategoryInv AS CI ON WI.PROD_CD= CI.PROD_CD
+	Inner Join inv i On WI.PROD_CD = i.PROD_CD
+	inner join WebCategory WC on WC.CategoryId=CI.CategoryID
+	
+	 left outer join [ProductsView] PV on PV.SKU=WI.PROD_CD
+	left outer join [CS_BestSellers] BS on bs.PROD_CD=WI.PROD_CD'	
+	
+	--exec @sql
+	BEGIN
+if(@CATEGORYID!='0')
+	BEGIN
+		if( @param=1)
+			begin
+			set @sql+=' WHERE CI.CategoryID='''+@CATEGORYID+''' and i.RETAIL_PRS between convert(decimal,'+convert(varchar(10), @minprice)+') and convert(decimal,'+ convert(varchar(10),@maxprice)+') '--order by i.CREATE_DT'
+			
+			end
+		ELSE IF(@param=0)
+		begin
+			set @sql+=' WHERE CI.CategoryID='''+@CATEGORYID+''' and i.RETAIL_PRS between convert(decimal,'+convert(varchar(10), @minprice)+') and convert(decimal,'+ convert(varchar(10),@maxprice)+') '--order by i.CREATE_DT'
+			end
+		 Else If(@param=2)
+			begin
+			set @sql+=' WHERE CI.CategoryID='''+@CATEGORYID+''' and i.RETAIL_PRS between convert(decimal,'+convert(varchar(10), @minprice)+') and convert(decimal,'+ convert(varchar(10),@maxprice)+') '--order by i.RETAIL_PRS DESC'		
+			end
+
+		Else if(@sort=0)
+		begin
+		set @sql+='  WHERE CI.CategoryID='''+@CATEGORYID+''' and i.RETAIL_PRS between convert(decimal,'+convert(varchar(10), @minprice)+') and convert(decimal,'+ convert(varchar(10),@maxprice)+') '
+		end
+	   else
+	    begin
+	      set @sql+=' WHERE CI.CategoryID='''+@CATEGORYID+''' and i.RETAIL_PRS between convert(decimal,'+convert(varchar(10), @minprice)+') and convert(decimal,'+ convert(varchar(10),@maxprice)+')  order by i.CREATE_DT'
+	   end
+	
+	END
+ELSE
+	BEGIN
+		if( @param=1)
+			begin
+			set @sql+=' WHERE   WC.CategoryId<>59 AND  WC.ParentId<>59  AND WC.ParentId=0 and i.RETAIL_PRS between convert(decimal,'+convert(varchar(10), @minprice)+') and convert(decimal,'+ convert(varchar(10),@maxprice)+') '--order by i.CREATE_DT' 
+			 
+			end
+		ELSE IF(@param=0)
+		begin
+			set @sql+=' WHERE   WC.CategoryId<>59 AND  WC.ParentId<>59  AND WC.ParentId=0 and i.RETAIL_PRS between convert(decimal,'+convert(varchar(10), @minprice)+') and convert(decimal,'+ convert(varchar(10),@maxprice)+') '--order by i.CREATE_DT'
+			
+			end
+
+		Else If(@param=2)
+			begin
+			set @sql+=' WHERE WC.CategoryId<>59 AND  WC.ParentId<>59  AND WC.ParentId=0 and i.RETAIL_PRS between convert(decimal,'+convert(varchar(10), @minprice)+') and convert(decimal,'+ convert(varchar(10),@maxprice)+') '--order by i.RETAIL_PRS DESC'		
+			end
+		
+	END	
+end
+if @cusType=1
+begin
+set @sql+=' AND  INSTOCK<>0 '
+end
+
+--if @sort='0'
+--begin
+--  set @sql+=' inner join BEST_SELLING BS on WI.PROD_CD = Bs.prod_cd WHERE CI.CategoryID='''+@CATEGORYID+''''
+--end
+ if @sort ='1'
+	   begin
+	      set @sql+=' order by i.CREATE_DT  DESC'
+	   end
+else if @sort ='2'
+	   begin
+	     set @sql+=' order by i.PROD_CD'
+	   end
+	   Else if @sort ='3'
+	   begin
+	   set @sql+=' order by RETAIL_PRS'
+	  end
+	   Else if @sort ='4'
+	   begin
+	   set @sql+=' order by RETAIL_PRS desc'
+	  end
+         Else if @sort ='5'
+	   begin
+	   set @sql+=' order by PV.InStock desc'    ---change by nisha patel(31-3-2017)--------------------
+	   	  end
+      Else
+		  BEGIN		
+		  set @sql+=' order by BS.[TotalSold] DESC'
+	 END
+	set @sql+=' OFFSET CONVERT(int,'''+ Convert(varchar(5),(@PageSize * (@PageNumber - 1)))+''')'	
+	set @sql+=' ROWS FETCH NEXT CONVERT(int,'''+  Convert(varchar(5),@PageSize) +''') ROWS ONLY;'
+	print @sql
+	Exec SP_Executesql @sql
+END
+END
+
+
+
+
+
+
+
+
+
